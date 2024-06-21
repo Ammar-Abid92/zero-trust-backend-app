@@ -1,30 +1,52 @@
+const fs = require("fs");
+const https = require("https");
 const express = require("express");
-const basicAuth = require("basic-auth");
+const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
-const morgan = require("morgan");
 const helmet = require("helmet");
-const { authorize, auth } = require("./middlewears");
+const morgan = require("morgan");
+const { authorize, authenticateToken } = require("./middlewears");
 
 dotenv.config();
-
 const app = express();
+
+const options = {
+  key: fs.readFileSync("server.key"),
+  cert: fs.readFileSync("server.cert"),
+  requestCert: true,
+  rejectUnauthorized: false, // Set to true to enforce client certificate validation
+  ca: [fs.readFileSync("server.cert")], // CA to validate client certificates
+};
 
 app.use(helmet());
 app.use(morgan("combined"));
-app.use(auth);
+app.use(express.json());
 
-app.get("/", authorize(["admin", "user"]), (req, res) => {
+// Login route to issue JWT token
+app.post("/login", (req, res) => {
+  const { username, role } = req.body;
+  const user = { name: username, role: role };
+
+  const accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET);
+  res.json({ accessToken });
+});
+
+// Protected routes
+app.get("/", authenticateToken, authorize(["admin", "user"]), (req, res) => {
   res.send("Hello, authenticated user!");
 });
 
-app.get("/admin", authorize(["admin"]), (req, res) => {
+app.get("/admin", authenticateToken, authorize(["admin"]), (req, res) => {
   res.send("Hello, admin!");
 });
 
-app.get("/user", authorize(["user"]), (req, res) => {
+app.get("/user", authenticateToken, authorize(["user"]), (req, res) => {
   res.send("Hello, user!");
 });
 
-app.listen(process.env.PORT, () => {
-  console.log(`Server is running on http://localhost:${process.env.PORT}`);
+// Create HTTPS server
+https.createServer(options, app).listen(process.env.PORT || 3000, () => {
+  console.log(
+    `HTTPS server running at https://localhost:${process.env.PORT || 3000}/`
+  );
 });

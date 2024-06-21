@@ -1,19 +1,23 @@
-const { users } = require("./constants");
+const jwt = require("jsonwebtoken");
 
-const auth = (req, res, next) => {
-  const user = basicAuth(req);
-  if (user && users[user.name] && users[user.name].password === user.pass) {
-    req.role = users[user.name].role;
-    return next();
-  } else {
-    res.set("WWW-Authenticate", 'Basic realm="example"');
-    return res.status(401).send("Authentication required.");
-  }
+// Middleware to check JWT token
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (token == null) return res.sendStatus(401);
+
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+    req.user = user;
+    next();
+  });
 };
 
+// Role-based access control (RBAC) middleware
 const authorize = (roles) => {
   return (req, res, next) => {
-    if (roles.includes(req.role)) {
+    if (roles.includes(req.user.role)) {
       return next();
     } else {
       return res.status(403).send("Forbidden");
@@ -21,4 +25,4 @@ const authorize = (roles) => {
   };
 };
 
-module.exports = { auth, authorize };
+module.exports = { authenticateToken, authorize };
