@@ -12,7 +12,7 @@ node server.js
 
 # This is the API cURL as follows:
 
-## For Root end point:
+## 1. For Root end point:
 
 #### For an admin user
 
